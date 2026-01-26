@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+models/
+voices/cache/
+*.wav
+!voices/*.wav
+!voices/default_ref.wav
+test_output.wav
+my_test_output.wav

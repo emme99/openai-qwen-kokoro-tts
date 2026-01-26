@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  qwen-tts:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/models
+      - ./voices:/app/voices
+      - ./config.json:/app/config.json
+    environment:
+      - MODEL_PATH=/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+      - DEVICE=cpu
+    restart: unless-stopped

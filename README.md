@@ -19,12 +19,29 @@ A fast, local, OpenAI-compatible Text-to-Speech API powered by [Qwen/Qwen3-TTS](
 docker-compose up --build
 ```
 
+**Using pure Docker**
+```bash
+# Build the image
+docker build -t qwen-tts-service .
+
+# Run the container (mounting models, voices, and config)
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/models:/models \
+  -v $(pwd)/voices:/app/voices \
+  -v $(pwd)/config.json:/app/config.json \
+  --name qwen-tts \
+  qwen-tts-service
+```
+
 **Manual Setup**
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn app:app --host 0.0.0.0 --port 8000
+source venv/bin/activate
+pip install -r requirements.txt
+python app.py
 ```
 
 ### 2. Usage

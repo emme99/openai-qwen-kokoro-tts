@@ -76,6 +76,7 @@ async def generate_speech(request: SpeechRequest):
             headers={"Content-Disposition": "attachment; filename=speech.wav"}
         )
 
+
     except Exception as e:
         logger.error(f"Error generating speech: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -83,3 +84,9 @@ async def generate_speech(request: SpeechRequest):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = config.get("port", 8000)
+    logger.info(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

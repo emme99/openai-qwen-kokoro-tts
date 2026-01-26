@@ -32,4 +32,5 @@ ENV MODEL_PATH=/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base
 EXPOSE 8000
 
 # Start command
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command
+CMD ["python", "app.py"]

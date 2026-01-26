@@ -37,10 +37,13 @@ curl -X POST http://localhost:8000/v1/audio/speech \
   -d '{
     "model": "qwen3-tts",
     "input": "Ciao, come stai?",
-    "voice": "Doc-F.wav"
+    "voice": "Doc-F.wav",
+    "language": "it"
   }' \
   --output output.wav
 ```
+
+**Supported Languages**: `it`, `en`, `zh`, `ja`, `ko`, `de`, `fr`, `ru`, `es`, `pt`.
 
 ### 3. Voice Management
 
@@ -56,7 +59,8 @@ Edit `config.json` to customize behavior:
     "model_path": "./models/Qwen/Qwen3-TTS-12Hz-0.6B-Base",
     "device": "cpu",          // Options: "cpu", "cuda", "mps" (experimental)
     "dtype": "float32",       // Options: "float32", "float16", "bfloat16"
-    "flash_attention": false  // Set true if flash-attn is installed
+    "flash_attention": false, // Set true if flash-attn is installed
+    "default_language": "it"  // Default language if not specified in request
 }
 ```
 

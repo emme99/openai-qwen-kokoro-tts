@@ -28,9 +28,10 @@ MODEL_PATH = os.getenv("MODEL_PATH", config.get("model_path", "./models/Qwen/Qwe
 DEVICE = os.getenv("DEVICE", config.get("device", "cpu"))
 DTYPE = os.getenv("DTYPE", config.get("dtype", "float32"))
 FLASH_ATTN = os.getenv("FLASH_ATTN", str(config.get("flash_attention", False))).lower() == "true"
+DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE", config.get("default_language", "it"))
 
 # Initialize Service
-logger.info(f"Initializing service with config: model={MODEL_PATH}, device={DEVICE}, dtype={DTYPE}, flash_attn={FLASH_ATTN}")
+logger.info(f"Initializing service with config: model={MODEL_PATH}, device={DEVICE}, dtype={DTYPE}, flash_attn={FLASH_ATTN}, lang={DEFAULT_LANGUAGE}")
 tts_service = QwenTTSService(
     model_path=MODEL_PATH, 
     device=DEVICE,
@@ -43,6 +44,7 @@ class SpeechRequest(BaseModel):
     model: str = "qwen3-tts"
     input: str
     voice: Optional[str] = "default"
+    language: Optional[str] = None # Extension: allow overriding language
     response_format: Optional[str] = "wav" # We mainly support mp3/wav, but we'll output wav for now
     speed: Optional[float] = 1.0
 
@@ -61,10 +63,9 @@ async def generate_speech(request: SpeechRequest):
         if not request.input:
             raise HTTPException(status_code=400, detail="Input text is required.")
 
-        # Determine language? defaulting to Italian as per user goal, 
-        # but could be inferred or passed in voice param.
-        # For this PoC, we stick to Italian.
-        language = "it" 
+        # Determine language
+        # Use request param if provided, otherwise default from config
+        language = request.language or DEFAULT_LANGUAGE
         
         audio_buffer = tts_service.synthesize(request.input, voice_ref_path=request.voice, lang=language)
         

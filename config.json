@@ -4,5 +4,5 @@
     "dtype": "float32",
     "flash_attention": false,
     "default_language": "it",
-    "port": 8000
+    "port": 5050
 }

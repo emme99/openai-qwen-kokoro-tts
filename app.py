@@ -44,8 +44,8 @@ class SpeechRequest(BaseModel):
     model: str = "qwen3-tts"
     input: str
     voice: Optional[str] = "default"
-    language: Optional[str] = None # Extension: allow overriding language
-    response_format: Optional[str] = "wav" # We mainly support mp3/wav, but we'll output wav for now
+    language: Optional[str] = None 
+    response_format: Optional[str] = "mp3" 
     speed: Optional[float] = 1.0
 
 @app.on_event("startup")
@@ -67,13 +67,25 @@ async def generate_speech(request: SpeechRequest):
         # Use request param if provided, otherwise default from config
         language = request.language or DEFAULT_LANGUAGE
         
-        audio_buffer = tts_service.synthesize(request.input, voice_ref_path=request.voice, lang=language)
+        audio_buffer = tts_service.synthesize(
+            request.input, 
+            voice_ref_path=request.voice, 
+            lang=language,
+            format=request.response_format
+        )
+        
+        media_type = "audio/wav"
+        filename = "speech.wav"
+        
+        if request.response_format == "mp3":
+            media_type = "audio/mpeg"
+            filename = "speech.mp3"
         
         # Return audio stream
         return StreamingResponse(
             audio_buffer, 
-            media_type="audio/wav",
-            headers={"Content-Disposition": "attachment; filename=speech.wav"}
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
 
 

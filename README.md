@@ -26,7 +26,7 @@ docker build -t qwen-tts-service .
 
 # Run the container (mounting models, voices, and config)
 docker run -d \
-  -p 8000:8000 \
+  -p 5050:5050 \
   -v $(pwd)/models:/models \
   -v $(pwd)/voices:/app/voices \
   -v $(pwd)/config.json:/app/config.json \
@@ -49,23 +49,35 @@ python app.py
 Generate speech using `curl`:
 
 ```bash
-curl -X POST http://localhost:8000/v1/audio/speech \
+curl -X POST http://localhost:5050/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{
     "model": "qwen3-tts",
     "input": "Ciao, come stai?",
-    "voice": "Doc-F.wav",
-    "language": "it"
+    "voice": "alloy",
+    "language": "it",
+    "response_format": "mp3"
   }' \
-  --output output.wav
+  --output output.mp3
 ```
+
+**Supported Formats**: `mp3` (default), `wav`.
+**Note**: `mp3` support requires `ffmpeg` to be installed on the system.
 
 **Supported Languages**: `it`, `en`, `zh`, `ja`, `ko`, `de`, `fr`, `ru`, `es`, `pt`.
 
 ### 3. Voice Management
 
-1.  Place your reference audio files (e.g., `my_voice.wav`) in the `voices/` directory.
-2.  Reference them in your API request: `"voice": "my_voice.wav"`.
+The system supports OpenAI-compatible voice names by mapping them to files in the `voices/` directory:
+
+- `alloy` -> tries `voices/alloy.wav`
+- `echo` -> tries `voices/echo.wav`
+- *Custom* -> tries `voices/{name}.wav` or `voices/{name}`
+
+If a requested voice is not found, it falls back to `voices/default.wav`.
+
+1.  Place your reference audio files (e.g., `alloy.wav`, `my_voice.wav`) in the `voices/` directory.
+2.  Reference them in your API request: `"voice": "alloy"`.
 
 ## Configuration
 

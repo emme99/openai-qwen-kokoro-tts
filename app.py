@@ -1,5 +1,6 @@
 import os
 import logging
+from time import perf_counter
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -67,12 +68,14 @@ async def generate_speech(request: SpeechRequest):
         # Use request param if provided, otherwise default from config
         language = request.language or DEFAULT_LANGUAGE
         
+        started_at = perf_counter()
         audio_buffer = tts_service.synthesize(
             request.input, 
             voice_ref_path=request.voice, 
             lang=language,
             format=request.response_format
         )
+        process_time_ms = (perf_counter() - started_at) * 1000
         
         media_type = "audio/wav"
         filename = "speech.wav"
@@ -85,7 +88,11 @@ async def generate_speech(request: SpeechRequest):
         return StreamingResponse(
             audio_buffer, 
             media_type=media_type,
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "X-Device": tts_service.device,
+                "X-Process-Time-Ms": f"{process_time_ms:.1f}",
+            }
         )
 
 

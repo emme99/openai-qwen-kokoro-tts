@@ -1,6 +1,6 @@
 # OpenAI-Compatible Qwen3-TTS Service
 
-A fast, local, OpenAI-compatible Text-to-Speech API powered by [Qwen/Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base). Designed for local deployment (Raspberry Pi, Mac, Linux) with support for persistent prompt caching and voice cloning.
+A fast, local, OpenAI-compatible Text-to-Speech API powered by [Qwen/Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base). Designed for local deployment on Mac and Linux with support for persistent prompt caching and voice cloning.
 
 ## Features
 
@@ -70,6 +70,8 @@ curl -X POST http://localhost:5050/v1/audio/speech \
 
 The system supports OpenAI-compatible voice names by mapping them to files in the `voices/` directory:
 
+(alloy, ash, coral, echo, fable, onyx, nova, sage, and shimmer)
+
 - `alloy` -> tries `voices/alloy.wav`
 - `echo` -> tries `voices/echo.wav`
 - *Custom* -> tries `voices/{name}.wav` or `voices/{name}`
@@ -93,6 +95,8 @@ Edit `config.json` to customize behavior:
 }
 ```
 
+On Apple Silicon, run the service natively with `python app.py` and set `device` to `mps` and `dtype` to `float32`. The Docker Compose configuration explicitly sets `DEVICE=cpu`, and a Docker container on macOS cannot access Apple's Metal/MPS backend. Keep `float32` for this model: `float16` produced invalid probabilities during local testing.
+
 ## References
 
 - [Qwen2.5-VL Technical Report](https://huggingface.co/papers/2501.12345) (Related architecture)
@@ -104,7 +108,7 @@ Edit `config.json` to customize behavior:
 This software uses advanced AI models for voice synthesis and cloning.
 - **Usage**: You are responsible for how you use this tool. Do not use it to clone voices without consent or for deceptive purposes (deepfakes, fraud).
 - **Limitations**: The model may hallucinate content or produce artifacts. It serves as a research and development tool.
-- **Compute**: Local inference can be heavy on resources. Ensure your hardware is adequate (Raspberry Pi 4 is the minimum target, Mac M-series or NVIDIA GPU recommended for best performance).
+- **Compute**: Local inference is resource-intensive. A modern CPU or supported GPU is recommended.
 
 ## License
 

@@ -70,19 +70,24 @@ class QwenTTSService:
             torch_dtype = torch.bfloat16
             
         kwargs = {}
+        if self.device == "mps":
+            if not torch.backends.mps.is_available():
+                raise RuntimeError("MPS is not available in this PyTorch installation.")
+            kwargs["device_map"] = self.device
         if self.flash_attn:
             kwargs["attn_implementation"] = "flash_attention_2"
 
         self.model = Qwen3TTSModel.from_pretrained(
             self.model_path, 
-            torch_dtype=torch_dtype,
+            dtype=torch_dtype,
             **kwargs
         )
         
         # Move to device if supported
-        if hasattr(self.model, "to"):
-            self.model.to(self.device)
-        elif hasattr(self.model, "model") and hasattr(self.model.model, "to"):
+        if self.device != "mps":
+            if hasattr(self.model, "to"):
+                self.model.to(self.device)
+            elif hasattr(self.model, "model") and hasattr(self.model.model, "to"):
                 self.model.model.to(self.device)
 
         logger.info("Model loaded successfully.")

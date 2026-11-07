@@ -14,6 +14,17 @@
         button:disabled { background: #ccc; }
         audio { width: 100%; margin-top: 1.5rem; }
         .status { margin-top: 1rem; font-size: 0.9rem; color: #666; }
+        .timings { margin-top: 1.5rem; border-top: 1px solid #e5e5e5; padding-top: 1rem; }
+        .timings h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+        .timing-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+        .timing-values p { margin: 0; min-width: 0; }
+        .timing-values span { display: block; color: #666; font-size: 0.75rem; }
+        .timing-values strong { display: block; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+        .timing-note { color: #666; font-size: 0.8rem; }
+        .timing-history { width: 100%; margin-top: 0.75rem; border-collapse: collapse; font-size: 0.85rem; }
+        .timing-history th, .timing-history td { padding: 0.4rem; border-bottom: 1px solid #eee; text-align: right; }
+        .timing-history th:first-child, .timing-history td:first-child { text-align: left; }
+        @media (max-width: 420px) { .timing-values { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     </style>
 </head>
 <body>
@@ -24,8 +35,17 @@
             <select id="voiceSelect" title="Seleziona la voce">
                 <option value="default">Default</option>
                 <option value="alloy">Alloy</option>
+                <option value="ash">Ash</option>
                 <option value="echo">Echo</option>
                 <option value="nova">Nova</option>
+                <option value="sage">Sage</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="languageSelect">Lingua</label>
+            <select id="languageSelect" title="Seleziona la lingua di sintesi">
+                <option value="it" selected>Italiano</option>
+                <option value="en">English</option>
             </select>
         </div>
         <div class="field">
@@ -35,6 +55,20 @@
         <button id="generateBtn">Genera Audio</button>
         <div id="status" class="status"></div>
         <audio id="audioPlayer" controls></audio>
+        <section class="timings" aria-labelledby="timingsTitle" aria-live="polite">
+            <h3 id="timingsTitle">Tempi</h3>
+            <div class="timing-values">
+                <p><span>Servizio TTS</span><strong id="serviceTime">--</strong></p>
+                <p><span>Richiesta completa</span><strong id="totalTime">--</strong></p>
+                <p><span>Mediana CPU</span><strong id="cpuMedianTime">--</strong></p>
+                <p><span>Mediana MPS</span><strong id="mpsMedianTime">--</strong></p>
+            </div>
+            <p class="timing-note">La prima richiesta può includere il caricamento del modello e l'elaborazione della voce.</p>
+            <table class="timing-history">
+                <thead><tr><th>Ora</th><th>Device</th><th>Servizio</th><th>Totale</th></tr></thead>
+                <tbody id="timingHistory"></tbody>
+            </table>
+        </section>
     </div>
     <script src="script.js"></script>
 </body>

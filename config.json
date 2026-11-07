@@ -1,6 +1,6 @@
 {
     "model_path": "./models/Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-    "device": "cpu", 
+    "device": "mps", 
     "dtype": "float32",
     "flash_attention": false,
     "default_language": "it",

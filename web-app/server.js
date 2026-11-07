@@ -4,7 +4,7 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 const TTS_API_URL = 'http://localhost:5050/v1/audio/speech';
 
 app.use(cors());
@@ -29,6 +29,14 @@ app.post('/api/generate', async (req, res) => {
 
         const contentType = response.headers['content-type'];
         res.set('Content-Type', contentType);
+        const processTime = response.headers['x-process-time-ms'];
+        if (processTime) {
+            res.set('X-TTS-Process-Time-Ms', processTime);
+        }
+        const device = response.headers['x-device'];
+        if (device) {
+            res.set('X-TTS-Device', device);
+        }
         res.send(response.data);
     } catch (error) {
         console.error('Error proxying to TTS service:', error.message);

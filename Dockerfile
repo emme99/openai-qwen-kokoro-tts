@@ -12,12 +12,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
-COPY requirements.txt .
+COPY requirements.txt requirements-qwen.txt .
 
 # Install Python dependencies
 # Note: For RPi specifically, we might want to target https://download.pytorch.org/whl/cpu
 # But for now we rely on standard pip which usually finds the right wheels.
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-qwen.txt
 
 # Copy application code
 COPY . .

@@ -38,10 +38,16 @@ docker run -d \
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt            # API + engine Kokoro (onnx, CPU)
+pip install -r requirements-qwen.txt       # solo per l'engine Qwen (torch)
 python app.py
+```
+
+For development/testing (no models, no torch needed):
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+ruff check .
 ```
 
 ### 2. Usage

@@ -1,0 +1,7 @@
+# Engine Qwen3-TTS (pesante: torch). Da installare insieme a requirements.txt.
+# Versioni pinnate: baseline verificata su macOS (M3 Max, Python 3.13).
+torch==2.15.0
+torchaudio==2.11.1
+transformers==4.57.3
+huggingface-hub
+qwen-tts==0.1.1

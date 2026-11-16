@@ -13,6 +13,11 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Carica .env una volta all'import (no-op se il file non esiste).
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 # Mappa campo Settings -> chiave in config.json (nomenclatura legacy)

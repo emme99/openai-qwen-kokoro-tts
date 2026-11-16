@@ -1,0 +1,10 @@
+# Stile ruff allineato a tutor-local: E/F/I, line-length 120.
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I"]
+
+[lint.per-file-ignores]
+# service.py: refactor graduale (T2.1), non bloccare la baseline.
+"service.py" = ["E501"]

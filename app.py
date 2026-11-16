@@ -1,14 +1,10 @@
 import logging
 from time import perf_counter
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional
-
-from dotenv import load_dotenv
-
-# Carica .env (se presente) PRIMA di risolvere le Settings
-load_dotenv()
 
 from config import Settings
 from service import QwenTTSService, VoiceNotFound

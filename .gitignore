@@ -5,8 +5,11 @@ __pycache__/
 node_modules/
 models/
 voices/cache/
+.env
+*.log
 *.wav
 !voices/*.wav
 !voices/default_ref.wav
 test_output.wav
 my_test_output.wav
+results/

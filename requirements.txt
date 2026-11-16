@@ -1,14 +1,13 @@
-fastapi
-uvicorn
-python-dotenv
-# Torch CPU version is preferred for RPi, but locally on Mac standard torch is fine.
-# For RPi Dockerfile we will specify the cpu wheel explicitly if needed, 
-# but for requirements.txt we keep it generic or platform specific.
-torch
-torchaudio
-transformers
+# Versioni pinnate: baseline verificata su macOS (M3 Max, Python 3.13).
+fastapi==0.162.0
+uvicorn==0.54.0
+python-dotenv==1.2.4
+pydantic==2.14.3
+torch==2.15.0
+torchaudio==2.11.1
+transformers==4.57.3
 huggingface-hub
-scipy
-numpy
-soundfile
-qwen-tts
+scipy==1.18.1
+numpy==2.5.4
+soundfile==0.14.0
+qwen-tts==0.1.1

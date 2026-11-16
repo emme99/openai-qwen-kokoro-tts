@@ -30,5 +30,10 @@ class TTSEngine(Protocol):
         ...
 
     def list_voices(self) -> list[str]:
-        """Voci native disponibili per questo engine."""
+        """Voci native dell'engine (es. id Kokoro). Per Qwen: []."""
+        ...
+
+    def list_voice_files(self) -> list[str]:
+        """Voci file-based (es. reference WAV di Qwen, senza estensione).
+        Per Kokoro: []."""
         ...

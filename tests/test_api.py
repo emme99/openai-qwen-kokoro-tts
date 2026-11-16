@@ -101,9 +101,61 @@ def test_voice_not_found_400(client, monkeypatch):
         raise VoiceNotFound(voice, ["alloy", "ash"])
 
     monkeypatch.setattr(app_module.engine, "synthesize", boom)
-    r = _post(client, {"input": "ciao", "voice": "inesistente"})
+    r = _post(client, {"input": "ciao", "voice": "alloy"})
     assert r.status_code == 400
     assert "alloy" in r.json()["detail"]
+
+
+# --- T3.2: risoluzione voce + headers + /v1/voices ---
+
+def test_voice_resolved_header(client):
+    r = _post(client, {"input": "ciao", "voice": "alloy", "language": "it"})
+    assert r.status_code == 200
+    assert r.headers["x-voice"] == "alloy"
+    assert "x-voice-fallback" not in r.headers
+
+
+def test_voice_default_resolves(client):
+    r = _post(client, {"input": "ciao", "voice": "default", "language": "en"})
+    assert r.status_code == 200
+    assert r.headers["x-voice"] == "ash"
+
+
+def test_voice_unresolvable_falls_back_to_default(client):
+    r = _post(client, {"input": "ciao", "voice": "inesistente", "language": "it"})
+    assert r.status_code == 200
+    assert r.headers["x-voice"] == "alloy"
+    assert r.headers["x-voice-fallback"] == "language-default"
+
+
+def test_cross_lingual_fallback_header(client, monkeypatch):
+    # ash (en) richiesta in italiano con engine qwen: la lingua della richiesta
+    # vince, ma il reference resta (cloning cross-lingual) con header di fallback.
+    from voices import load_registry
+
+    monkeypatch.setattr(app_module.engine, "name", "qwen")
+    monkeypatch.setattr(app_module, "registry", load_registry(app_module.settings.voices_registry))
+    r = _post(client, {"input": "ciao", "voice": "ash", "language": "it"})
+    assert r.status_code == 200
+    assert r.headers["x-voice"] == "voices/ash.wav"
+    assert r.headers["x-voice-fallback"] == "cross-lingual"
+
+
+def test_unsupported_language_400(client):
+    r = _post(client, {"input": "ciao", "voice": "alloy", "language": "fr"})
+    assert r.status_code == 400
+    assert "fr" in r.json()["detail"]
+
+
+def test_voices_endpoint(client):
+    r = client.get("/v1/voices")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["engine"] == "fake"
+    assert body["defaults"] == {"it": "alloy", "en": "ash"}
+    assert {v["name"] for v in body["registry"]} == {"alloy", "ash"}
+    assert body["native"] == ["if_sara", "am_adam"]
+    assert body["files"] == ["alloy", "ash", "custom"]
 
 
 def test_engine_error_500(client, monkeypatch):
@@ -118,16 +170,16 @@ def test_engine_error_500(client, monkeypatch):
 # --- Concorrenza: lock serializza, /health resta responsive ---
 
 @pytest.fixture
-def swap_engine():
-    """Sostituisce app.engine e lo restaura dopo il test."""
-    original = app_module.engine
+def swap_engine(monkeypatch):
+    """Sostituisce app.engine (e il registro) e li restaura dopo il test."""
+    from tests.conftest import TEST_REGISTRY
 
     def _swap(fake):
-        app_module.engine = fake
+        monkeypatch.setattr(app_module, "engine", fake)
+        monkeypatch.setattr(app_module, "registry", TEST_REGISTRY)
         return fake
 
     yield _swap
-    app_module.engine = original
 
 
 def test_concurrent_requests_serialized(swap_engine):

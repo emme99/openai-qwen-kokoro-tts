@@ -12,6 +12,7 @@ import audio
 from config import Settings
 from engines import make_engine
 from errors import VoiceNotFound
+from voices import VoiceResolutionError, load_registry, resolve_voice
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,9 @@ settings = Settings.load()
 
 # Engine selezionato da TTS_ENGINE (modello non ancora caricato: vedi lifespan).
 engine = make_engine(settings)
+
+# Registro voci unificato (voices.toml): nome logico -> binding per engine.
+registry = load_registry(settings.voices_registry)
 
 logger.info(
     f"Initializing TTS service: engine={engine.name}, device={settings.device}, "
@@ -78,9 +82,17 @@ async def generate_speech(request: SpeechRequest):
                 detail=f"speed deve essere in [{audio.SPEED_MIN}, {audio.SPEED_MAX}], ricevuto {speed}",
             )
 
-        # Determine language
-        # Use request param if provided, otherwise default from settings
-        language = request.language or settings.default_language
+        # Risoluzione voce unificata (registro + default per lingua, §3)
+        resolved = resolve_voice(
+            request.voice,
+            request.language,
+            engine.name,
+            registry,
+            engine.list_voice_files(),
+            engine.list_voices(),
+            {"it": settings.voice_it, "en": settings.voice_en},
+            default_language=settings.default_language,
+        )
 
         started_at = perf_counter()
         # L'engine ritorna (samples float32, sample_rate); speed e formato sono
@@ -91,8 +103,8 @@ async def generate_speech(request: SpeechRequest):
             samples, sample_rate = await asyncio.to_thread(
                 engine.synthesize,
                 request.input,
-                voice=request.voice,
-                language=language,
+                voice=resolved.binding,
+                language=resolved.language,
             )
 
         # Percorso unico di rendering (atempo + encoding) in audio.py
@@ -103,20 +115,23 @@ async def generate_speech(request: SpeechRequest):
         process_time_ms = (perf_counter() - started_at) * 1000
 
         # Return audio stream (lista di chunk: audio_buffer è bytes)
-        return StreamingResponse(
-            [audio_buffer],
-            media_type=media_type,
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}",
-                "X-Engine": engine.name,
-                "X-Device": getattr(engine, "device", settings.device),
-                "X-Process-Time-Ms": f"{process_time_ms:.1f}",
-            }
-        )
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "X-Engine": engine.name,
+            "X-Voice": resolved.binding,
+            "X-Device": getattr(engine, "device", settings.device),
+            "X-Process-Time-Ms": f"{process_time_ms:.1f}",
+        }
+        if resolved.fallback:
+            headers["X-Voice-Fallback"] = resolved.fallback
+        return StreamingResponse([audio_buffer], media_type=media_type, headers=headers)
 
-
+    except VoiceResolutionError as e:
+        # Voce/lingua non risolvibile: 400 con elenco voci disponibili. Mai rumore.
+        logger.warning(f"Voice resolution failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except VoiceNotFound as e:
-        # Voce non risolvibile: errore esplicito con elenco voci disponibili.
+        # Voce non risolvibile a livello engine: errore esplicito.
         logger.warning(f"Voice not found: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
@@ -125,6 +140,21 @@ async def generate_speech(request: SpeechRequest):
     except Exception as e:
         logger.error(f"Error generating speech: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/voices")
+def list_voices():
+    """Registro voci ispezionabile: engine, default per lingua, registro,
+    voci native e file reference disponibili."""
+    return {
+        "engine": engine.name,
+        "defaults": {"it": settings.voice_it, "en": settings.voice_en},
+        "registry": [
+            {"name": name, **entry} for name, entry in sorted(registry.items())
+        ],
+        "native": engine.list_voices(),
+        "files": engine.list_voice_files(),
+    }
+
 
 @app.get("/health")
 def health_check():

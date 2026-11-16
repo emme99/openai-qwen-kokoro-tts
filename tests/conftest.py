@@ -48,12 +48,22 @@ class FakeEngine:
         return samples, self.sample_rate
 
     def list_voices(self) -> list[str]:
-        return ["alloy", "ash"]
+        return ["if_sara", "am_adam"]
+
+    def list_voice_files(self) -> list[str]:
+        return ["alloy", "ash", "custom"]
 
 
 @pytest.fixture
 def fake_engine():
     return FakeEngine()
+
+
+# Registro di test: include il binding per il FakeEngine (name "fake").
+TEST_REGISTRY = {
+    "alloy": {"language": "it", "fake": "alloy", "qwen": "voices/alloy.wav", "kokoro": "if_sara"},
+    "ash": {"language": "en", "fake": "ash", "qwen": "voices/ash.wav", "kokoro": "am_adam"},
+}
 
 
 @pytest.fixture
@@ -63,5 +73,6 @@ def client(fake_engine, monkeypatch):
 
     monkeypatch.setattr(app_module, "engine", fake_engine)
     monkeypatch.setattr(app_module.settings, "preload", False)
+    monkeypatch.setattr(app_module, "registry", TEST_REGISTRY)
     with TestClient(app_module.app) as c:
         yield c

@@ -68,6 +68,10 @@ class QwenEngine:
         return samples, sr
 
     def list_voices(self) -> list[str]:
+        # Qwen non ha voci native: la voce è un file reference.
+        return []
+
+    def list_voice_files(self) -> list[str]:
         # I file reference in voices/ non richiedono il modello caricato.
         from service import list_voice_files
 

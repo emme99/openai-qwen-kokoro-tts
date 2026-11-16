@@ -64,35 +64,59 @@ curl -X POST http://localhost:5050/v1/audio/speech \
 **Supported Formats**: `mp3` (default), `wav`.
 **Note**: `mp3` support requires `ffmpeg` to be installed on the system.
 
-**Supported Languages**: `it`, `en`, `zh`, `ja`, `ko`, `de`, `fr`, `ru`, `es`, `pt`.
+**Supported Languages**: `it`, `en` (default per lingua configurabile in `.env`).
+
+**Response headers**: `X-Engine` (engine attivo), `X-Voice` (binding risolto),
+`X-Voice-Fallback` (solo se scattato: `cross-lingual` o `language-default`),
+`X-Device`, `X-Process-Time-Ms`.
 
 ### 3. Voice Management
 
-The system supports OpenAI-compatible voice names by mapping them to files in the `voices/` directory:
+Voices are resolved through a unified registry (`voices.toml`): a stable logical
+name maps to a per-engine binding, so clients don't need to know whether the
+active engine uses reference files (Qwen) or built-in voices (Kokoro).
 
-(alloy, ash, coral, echo, fable, onyx, nova, sage, and shimmer)
+Resolution order:
 
-- `alloy` -> tries `voices/alloy.wav`
-- `echo` -> tries `voices/echo.wav`
-- *Custom* -> tries `voices/{name}.wav` or `voices/{name}`
-
-If a requested voice is not found, it falls back to `voices/default.wav`.
+1. `language` missing → `DEFAULT_LANGUAGE`; unsupported language → `400`.
+2. `voice` in the registry → binding of the active engine; missing binding → step 4.
+3. `voice` not in the registry: Qwen → legacy file `voices/{voice}.wav`;
+   Kokoro → valid native voice id (passthrough).
+4. Unresolvable (or `voice="default"`/empty) → per-language default
+   (`VOICE_IT`/`VOICE_EN`). If even that fails → `400` with the list of
+   available voices. Never noise.
+5. Language policy: the requested language always wins. Qwen cloning is
+   cross-lingual (reference kept, `X-Voice-Fallback: cross-lingual`); Kokoro
+   voices are language-bound (replaced with the language default,
+   `X-Voice-Fallback: language-default`).
 
 1.  Place your reference audio files (e.g., `alloy.wav`, `my_voice.wav`) in the `voices/` directory.
 2.  Reference them in your API request: `"voice": "alloy"`.
 
+Inspect the current voice setup with:
+
+```bash
+curl http://localhost:5050/v1/voices
+```
+
+Returns `{engine, defaults: {it, en}, registry: [...], native: [...], files: [...]}`.
+
 ## Configuration
 
-Edit `config.json` to customize behavior:
+Configuration is read from environment variables (see `.env.example`);
+`config.json` is still honored for backward compatibility but deprecated
+(a warning is logged once). Precedence: env > config.json > default.
 
-```json
-{
-    "model_path": "./models/Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-    "device": "cpu",          // Options: "cpu", "cuda", "mps" (experimental)
-    "dtype": "float32",       // Options: "float32", "float16", "bfloat16"
-    "flash_attention": false, // Set true if flash-attn is installed
-    "default_language": "it"  // Default language if not specified in request
-}
+```bash
+MODEL_PATH=./models/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+DEVICE=cpu            # Options: cpu, cuda, mps (experimental)
+DTYPE=float32         # Options: float32, float16, bfloat16
+FLASH_ATTN=false      # Set true if flash-attn is installed
+DEFAULT_LANGUAGE=it   # Default language if not specified in request
+VOICE_IT=alloy        # Default voice for Italian
+VOICE_EN=ash          # Default voice for English
+TTS_ENGINE=qwen       # Options: qwen, kokoro
+PRELOAD=true          # Load the model at startup
 ```
 
 On Apple Silicon, run the service natively with `python app.py` and set `device` to `mps` and `dtype` to `float32`. The Docker Compose configuration explicitly sets `DEVICE=cpu`, and a Docker container on macOS cannot access Apple's Metal/MPS backend. Keep `float32` for this model: `float16` produced invalid probabilities during local testing.

@@ -1,29 +1,40 @@
 import asyncio
-import io
 import logging
 from contextlib import asynccontextmanager
 from time import perf_counter
 from typing import Optional
 
-import soundfile as sf
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import audio
 from config import Settings
-from service import QwenTTSService, VoiceNotFound
+from engines import make_engine
+from errors import VoiceNotFound
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("qwen-tts-api")
+
+# Settings: precedenza env > config.json (deprecato) > default
+settings = Settings.load()
+
+# Engine selezionato da TTS_ENGINE (modello non ancora caricato: vedi lifespan).
+engine = make_engine(settings)
+
+logger.info(
+    f"Initializing TTS service: engine={engine.name}, device={settings.device}, "
+    f"lang={settings.default_language}"
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Preload del modello all'avvio se PRELOAD=true (in thread, non blocca l'event loop)."""
     if settings.preload:
         logger.info("PRELOAD=true: carico il modello all'avvio...")
-        await asyncio.to_thread(tts_service.load_model)
+        await asyncio.to_thread(engine.load)
         logger.info("Modello precaricato.")
     yield
 
@@ -32,21 +43,6 @@ app = FastAPI(title="Qwen3 TTS OpenAI API", lifespan=lifespan)
 
 # Lock globale: l'inferenza è bloccante e va serializzata (un solo modello in RAM).
 _inference_lock = asyncio.Lock()
-
-# Settings: precedenza env > config.json (deprecato) > default
-settings = Settings.load()
-
-# Initialize Service
-logger.info(
-    f"Initializing service with config: model={settings.model_path}, device={settings.device}, "
-    f"dtype={settings.dtype}, flash_attn={settings.flash_attn}, lang={settings.default_language}"
-)
-tts_service = QwenTTSService(
-    model_path=settings.model_path,
-    device=settings.device,
-    dtype=settings.dtype,
-    flash_attn=settings.flash_attn
-)
 
 # OpenAI-compatible Request Model
 class SpeechRequest(BaseModel):
@@ -87,18 +83,17 @@ async def generate_speech(request: SpeechRequest):
         language = request.language or settings.default_language
 
         started_at = perf_counter()
-        # L'engine produce sempre WAV; speed e formato sono centralizzati in audio.py.
-        # Inferenza in thread separato sotto lock: serializza le richieste concorrenti
-        # senza bloccare l'event loop (pattern identico a tutor-local/backend/app/providers/stt.py).
+        # L'engine ritorna (samples float32, sample_rate); speed e formato sono
+        # centralizzati in audio.py. Inferenza in thread separato sotto lock:
+        # serializza le richieste concorrenti senza bloccare l'event loop
+        # (pattern identico a tutor-local/backend/app/providers/stt.py).
         async with _inference_lock:
-            wav_buffer = await asyncio.to_thread(
-                tts_service.synthesize,
+            samples, sample_rate = await asyncio.to_thread(
+                engine.synthesize,
                 request.input,
-                voice_ref_path=request.voice,
-                lang=language,
-                format="wav",
+                voice=request.voice,
+                language=language,
             )
-        samples, sample_rate = sf.read(io.BytesIO(wav_buffer.getvalue()), dtype="float32")
 
         # Catena atempo (pitch preservato) prima dell'eventuale mp3
         samples = audio.apply_atempo(samples, sample_rate, speed)
@@ -120,7 +115,8 @@ async def generate_speech(request: SpeechRequest):
             media_type=media_type,
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
-                "X-Device": tts_service.device,
+                "X-Engine": engine.name,
+                "X-Device": getattr(engine, "device", settings.device),
                 "X-Process-Time-Ms": f"{process_time_ms:.1f}",
             }
         )
@@ -141,9 +137,9 @@ async def generate_speech(request: SpeechRequest):
 def health_check():
     return {
         "status": "ok",
-        "engine": settings.tts_engine,
-        "device": tts_service.device,
-        "model_loaded": tts_service.model is not None,
+        "engine": engine.name,
+        "device": getattr(engine, "device", settings.device),
+        "model_loaded": getattr(engine, "model_loaded", False),
         "defaults": {"it": settings.voice_it, "en": settings.voice_en},
     }
 

@@ -7,7 +7,7 @@ import os
 import pytest
 
 import app as app_module
-from service import QwenTTSService
+from tests.conftest import requires_torch
 
 # --- Guardrail input ---
 
@@ -28,6 +28,8 @@ def test_input_at_limit_ok(client, monkeypatch):
 
 @pytest.fixture
 def svc(tmp_path):
+    from service import QwenTTSService  # import pesante (torch): solo nel test
+
     voices = tmp_path / "voices"
     voices.mkdir()
     s = QwenTTSService(model_path=str(tmp_path / "model"), device="cpu")
@@ -45,6 +47,7 @@ def _cache_files(svc, voice="alloy"):
     )
 
 
+@requires_torch
 def test_prune_keeps_two_newest(svc):
     # 3 mtime diversi per la stessa voce
     for mtime in (1000.0, 2000.0, 3000.0):
@@ -56,6 +59,7 @@ def test_prune_keeps_two_newest(svc):
     assert remaining == ["alloy.wav_2000.0.pt", "alloy.wav_3000.0.pt"]
 
 
+@requires_torch
 def test_prune_noop_when_under_limit(svc):
     for mtime in (1000.0, 2000.0):
         with open(os.path.join(svc.cache_dir, f"alloy.wav_{mtime}.pt"), "wb") as f:
@@ -64,6 +68,7 @@ def test_prune_noop_when_under_limit(svc):
     assert len(_cache_files(svc, "alloy.wav")) == 2
 
 
+@requires_torch
 def test_prune_does_not_touch_other_voices(svc):
     for mtime in (1000.0, 2000.0, 3000.0):
         with open(os.path.join(svc.cache_dir, f"alloy.wav_{mtime}.pt"), "wb") as f:

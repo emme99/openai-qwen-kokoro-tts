@@ -10,22 +10,19 @@ from huggingface_hub import snapshot_download
 # in T2.1 verrà spostato dentro load() del wrapper engine.
 from qwen_tts import Qwen3TTSModel
 
+from errors import VoiceNotFound  # noqa: F401  (re-export per compatibilità)
+
 logger = logging.getLogger(__name__)
 
 
-class VoiceNotFound(Exception):
-    """Nessuna voce risolvibile per la richiesta.
-
-    Il messaggio contiene l'elenco delle voci disponibili, così il client
-    riceve un errore esplicito (HTTP 400) invece di un fallback rumoroso.
-    """
-
-    def __init__(self, requested: str, available: list[str]):
-        self.requested = requested
-        self.available = available
-        super().__init__(
-            f"Voce '{requested}' non trovata. Voci disponibili: {', '.join(available) or '(nessuna)'}"
-        )
+def list_voice_files(voices_dir: str = "voices") -> list[str]:
+    """Nomi dei file reference in voices/ (senza estensione). Non richiede il modello."""
+    names = []
+    if os.path.isdir(voices_dir):
+        for entry in sorted(os.listdir(voices_dir)):
+            if entry.lower().endswith(".wav"):
+                names.append(entry[: -len(".wav")])
+    return names
 
 
 class QwenTTSService:
@@ -44,12 +41,7 @@ class QwenTTSService:
 
     def list_voices(self) -> list[str]:
         """Nomi delle voci disponibili in voices/ (senza estensione)."""
-        names = []
-        if os.path.isdir(self.voices_dir):
-            for entry in sorted(os.listdir(self.voices_dir)):
-                if entry.lower().endswith(".wav"):
-                    names.append(entry[: -len(".wav")])
-        return names
+        return list_voice_files(self.voices_dir)
 
     def _prune_voice_cache(self, voice_name: str, keep: int = 2):
         """Mantiene al massimo `keep` file di cache per voce, cancellando i più vecchi.

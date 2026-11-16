@@ -21,21 +21,21 @@ def test_health(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["engine"] == "qwen"
+    assert body["engine"] == "fake"
     assert body["device"] == "fake"
     assert body["model_loaded"] is False
     assert body["defaults"] == {"it": "alloy", "en": "ash"}
 
 
-def test_preload_calls_load_model(monkeypatch):
-    """Con PRELOAD=true il lifespan chiama load_model all'avvio."""
+def test_preload_calls_load(monkeypatch):
+    """Con PRELOAD=true il lifespan chiama engine.load() all'avvio."""
     from tests.conftest import FakeEngine
 
     fake = FakeEngine()
     loaded = []
-    fake.load_model = lambda: loaded.append(True)
+    fake.load = lambda: loaded.append(True)
 
-    monkeypatch.setattr(app_module, "tts_service", fake)
+    monkeypatch.setattr(app_module, "engine", fake)
     monkeypatch.setattr(app_module.settings, "preload", True)
 
     with TestClient(app_module.app):
@@ -44,15 +44,15 @@ def test_preload_calls_load_model(monkeypatch):
     assert loaded == [True]
 
 
-def test_no_preload_skips_load_model(monkeypatch):
+def test_no_preload_skips_load(monkeypatch):
     """Con PRELOAD=false il modello non viene caricato all'avvio."""
     from tests.conftest import FakeEngine
 
     fake = FakeEngine()
     loaded = []
-    fake.load_model = lambda: loaded.append(True)
+    fake.load = lambda: loaded.append(True)
 
-    monkeypatch.setattr(app_module, "tts_service", fake)
+    monkeypatch.setattr(app_module, "engine", fake)
     monkeypatch.setattr(app_module.settings, "preload", False)
 
     with TestClient(app_module.app):
@@ -95,22 +95,22 @@ def test_speed_in_range_ok(client):
 
 def test_voice_not_found_400(client, monkeypatch):
     # Engine che alza VoiceNotFound
-    from service import VoiceNotFound
+    from errors import VoiceNotFound
 
-    def boom(text, voice_ref_path=None, lang="it", format="wav"):
-        raise VoiceNotFound(voice_ref_path, ["alloy", "ash"])
+    def boom(text, *, voice, language):
+        raise VoiceNotFound(voice, ["alloy", "ash"])
 
-    monkeypatch.setattr(app_module.tts_service, "synthesize", boom)
+    monkeypatch.setattr(app_module.engine, "synthesize", boom)
     r = _post(client, {"input": "ciao", "voice": "inesistente"})
     assert r.status_code == 400
     assert "alloy" in r.json()["detail"]
 
 
 def test_engine_error_500(client, monkeypatch):
-    def boom(text, voice_ref_path=None, lang="it", format="wav"):
+    def boom(text, *, voice, language):
         raise RuntimeError("modello rotto")
 
-    monkeypatch.setattr(app_module.tts_service, "synthesize", boom)
+    monkeypatch.setattr(app_module.engine, "synthesize", boom)
     r = _post(client, {"input": "ciao", "voice": "alloy"})
     assert r.status_code == 500
 
@@ -119,15 +119,15 @@ def test_engine_error_500(client, monkeypatch):
 
 @pytest.fixture
 def swap_engine():
-    """Sostituisce app.tts_service e lo restaura dopo il test."""
-    original = app_module.tts_service
+    """Sostituisce app.engine e lo restaura dopo il test."""
+    original = app_module.engine
 
     def _swap(fake):
-        app_module.tts_service = fake
+        app_module.engine = fake
         return fake
 
     yield _swap
-    app_module.tts_service = original
+    app_module.engine = original
 
 
 def test_concurrent_requests_serialized(swap_engine):

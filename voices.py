@@ -39,6 +39,29 @@ class ResolvedVoice:
     language: str
 
 
+# Prefisso voce nativa Kokoro -> lingua (voices-v1.0.bin).
+# i* = italiano, a*/b* = inglese; gli altri prefissi (jf_, zf_, ...) sono
+# lingue non supportate dal servizio.
+_NATIVE_PREFIX_LANG = {
+    "if": "it",
+    "im": "it",
+    "af": "en",
+    "am": "en",
+    "bf": "en",
+    "bm": "en",
+}
+
+
+def native_voice_language(voice: str) -> str | None:
+    """Lingua di una voce nativa Kokoro dal prefisso (if_/im_ -> it, af_/am_/bf_/bm_ -> en).
+
+    Ritorna None per prefissi sconosciuti (es. jf_, zf_): la voce non è
+    usabile per le lingue del servizio.
+    """
+    prefix = voice.split("_", 1)[0]
+    return _NATIVE_PREFIX_LANG.get(prefix)
+
+
 def load_registry(path: str | Path) -> Registry:
     """Legge voices.toml (tomllib è stdlib). File assente -> registro vuoto."""
     p = Path(path)
@@ -102,7 +125,8 @@ def resolve_voice(
     1. language mancante -> default_language; non in mappa -> VoiceResolutionError (400).
     2. voice nel registro -> binding dell'engine; binding mancante -> passo 4.
     3. voice fuori registro: qwen -> file legacy voices/{voice}.wav;
-       kokoro -> id nativo valido (passthrough).
+       kokoro -> id nativo valido (passthrough) solo se la lingua della voce
+       (dal prefisso) coincide con quella richiesta, altrimenti default.
     4. Non risolvibile / "default" / vuoto -> default per lingua;
        se anche quello fallisce -> VoiceResolutionError. Mai rumore.
     5. Politica lingua: la lingua della richiesta vince sempre.
@@ -149,7 +173,20 @@ def resolve_voice(
     if engine == "qwen" and f"{voice}.wav" in files:
         return ResolvedVoice(f"{voice}.wav", None, lang)
     if engine == "kokoro" and voice in native:
-        return ResolvedVoice(voice, None, lang)
+        # Le voci Kokoro sono legate alla lingua: passthrough solo se la lingua
+        # della voce coincide con quella richiesta (prefisso if_/im_ -> it,
+        # af_/am_/bf_/bm_ -> en). Altrimenti -> default della lingua richiesta.
+        voice_lang = native_voice_language(voice)
+        if voice_lang == lang:
+            return ResolvedVoice(voice, None, lang)
+        logger.warning(
+            "Voce nativa '%s' (%s) non compatibile con la lingua '%s': uso il default",
+            voice, voice_lang or "sconosciuta", lang,
+        )
+        return ResolvedVoice(
+            _language_default(lang, engine, registry, files, native, defaults),
+            "language-default", lang,
+        )
 
     # 4. Non risolvibile -> default per lingua
     logger.warning("Voce '%s' non risolvibile: uso il default per lingua '%s'", voice, lang)

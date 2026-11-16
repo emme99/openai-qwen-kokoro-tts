@@ -32,6 +32,11 @@ class KokoroEngine:
         self._k = None  # istanziato dentro load()
 
     @property
+    def device(self) -> str:
+        # kokoro-onnx gira sempre su CPU (onnxruntime).
+        return "cpu"
+
+    @property
     def model_loaded(self) -> bool:
         return self._k is not None
 

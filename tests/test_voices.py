@@ -2,7 +2,7 @@
 
 import pytest
 
-from voices import VoiceResolutionError, load_registry, resolve_voice
+from voices import VoiceResolutionError, load_registry, native_voice_language, resolve_voice
 
 REGISTRY = {
     "alloy": {"language": "it", "qwen": "voices/alloy.wav", "kokoro": "if_sara"},
@@ -75,6 +75,46 @@ def test_kokoro_native_passthrough():
     r = _resolve("af_bella", "en", "kokoro")
     assert r.binding == "af_bella"
     assert r.fallback is None
+
+
+def test_kokoro_native_passthrough_italian():
+    r = _resolve("if_sara", "it", "kokoro")
+    assert r.binding == "if_sara"
+    assert r.fallback is None
+
+
+def test_kokoro_native_language_mismatch_falls_back():
+    # if_sara (it) richiesta in inglese -> default en (ash) -> am_adam
+    r = _resolve("if_sara", "en", "kokoro")
+    assert r.binding == "am_adam"
+    assert r.fallback == "language-default"
+
+
+def test_kokoro_native_unknown_prefix_falls_back():
+    # jf_alpha (giapponese) non è usabile per it/en -> default
+    reg = {
+        "alloy": {"language": "it", "kokoro": "if_sara"},
+        "ash": {"language": "en", "kokoro": "am_adam"},
+    }
+    r = resolve_voice(
+        "jf_alpha", "it", "kokoro", reg, FILES, ["jf_alpha"], DEFAULTS,
+        default_language="it",
+    )
+    assert r.binding == "if_sara"
+    assert r.fallback == "language-default"
+
+
+# --- Prefisso -> lingua (voci native Kokoro) ---
+
+def test_native_voice_language_prefixes():
+    assert native_voice_language("if_sara") == "it"
+    assert native_voice_language("im_nicola") == "it"
+    assert native_voice_language("af_heart") == "en"
+    assert native_voice_language("am_adam") == "en"
+    assert native_voice_language("bf_emma") == "en"
+    assert native_voice_language("bm_lewis") == "en"
+    assert native_voice_language("jf_alpha") is None
+    assert native_voice_language("zf_xiaobei") is None
 
 
 def test_qwen_unknown_name_falls_back_to_default():

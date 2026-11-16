@@ -81,7 +81,9 @@ Resolution order:
 1. `language` missing → `DEFAULT_LANGUAGE`; unsupported language → `400`.
 2. `voice` in the registry → binding of the active engine; missing binding → step 4.
 3. `voice` not in the registry: Qwen → legacy file `voices/{voice}.wav`;
-   Kokoro → valid native voice id (passthrough).
+   Kokoro → valid native voice id (passthrough), only when the voice's
+   language (from its prefix: `if_`/`im_` → Italian, `af_`/`am_`/`bf_`/`bm_`
+   → English) matches the requested language; otherwise step 4.
 4. Unresolvable (or `voice="default"`/empty) → per-language default
    (`VOICE_IT`/`VOICE_EN`). If even that fails → `400` with the list of
    available voices. Never noise.

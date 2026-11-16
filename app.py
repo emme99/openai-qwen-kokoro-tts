@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from config import Settings
-from service import QwenTTSService
+from service import QwenTTSService, VoiceNotFound
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -90,6 +90,10 @@ async def generate_speech(request: SpeechRequest):
         )
 
 
+    except VoiceNotFound as e:
+        # Voce non risolvibile: errore esplicito con elenco voci disponibili.
+        logger.warning(f"Voice not found: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error generating speech: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

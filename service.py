@@ -6,15 +6,27 @@ import logging
 import pickle
 from huggingface_hub import snapshot_download
 
-# We wrap the import in try-except to avoid crashing if dependencies aren't fully installed during development interrogation
-try:
-    from qwen_tts.infer import Qwen3TTSModel
-except ImportError:
-    pass
-
-from qwen_tts import Qwen3TTSModel # Re-importing cleanly
+# Import pesante: qwen_tts trascina torch. Lo teniamo a livello modulo per ora;
+# in T2.1 verrà spostato dentro load() del wrapper engine.
+from qwen_tts import Qwen3TTSModel
 
 logger = logging.getLogger(__name__)
+
+
+class VoiceNotFound(Exception):
+    """Nessuna voce risolvibile per la richiesta.
+
+    Il messaggio contiene l'elenco delle voci disponibili, così il client
+    riceve un errore esplicito (HTTP 400) invece di un fallback rumoroso.
+    """
+
+    def __init__(self, requested: str, available: list[str]):
+        self.requested = requested
+        self.available = available
+        super().__init__(
+            f"Voce '{requested}' non trovata. Voci disponibili: {', '.join(available) or '(nessuna)'}"
+        )
+
 
 class QwenTTSService:
     def __init__(self, model_path, device="cpu", dtype="float32", flash_attn=False):
@@ -29,6 +41,15 @@ class QwenTTSService:
         # In-memory cache for the last used voice prompt
         self.last_voice_path = None
         self.last_prompt = None
+
+    def list_voices(self) -> list[str]:
+        """Nomi delle voci disponibili in voices/ (senza estensione)."""
+        names = []
+        if os.path.isdir(self.voices_dir):
+            for entry in sorted(os.listdir(self.voices_dir)):
+                if entry.lower().endswith(".wav"):
+                    names.append(entry[: -len(".wav")])
+        return names
 
     def load_model(self):
         if self.model is not None:
@@ -139,34 +160,16 @@ class QwenTTSService:
                         target_voice = candidate
                         break
         
-        # Fallback Logic
+        # Nessun fallback rumoroso: se la voce non si risolve, errore esplicito.
+        # (Il default per lingua è gestito a livello API dal registro voci.)
         if not target_voice:
-             logger.info(f"Voice '{voice_ref_path}' not found. Looking for defaults...")
-             default_candidates = [
-                 os.path.join(self.voices_dir, "default.wav"),
-             ]
-             
-             for candidate in default_candidates:
-                 if os.path.exists(candidate):
-                     target_voice = candidate
-                     logger.info(f"Using fallback voice: {target_voice}")
-                     break
-        
-        if not target_voice:
-             # If still no voice, create a dummy default.wav
-             logger.warning("No default voice found. Creating default.wav from noise.")
-             target_voice = os.path.join(self.voices_dir, "default.wav")
-             try:
-                 import numpy as np
-                 sr=16000
-                 noise = np.random.uniform(-0.1, 0.1, sr*3)
-                 sf.write(target_voice, noise, sr)
-             except Exception as e:
-                 logger.error(f"Could not create default voice: {e}")
+             available = self.list_voices()
+             logger.error(f"Voice '{voice_ref_path}' not found. Available: {available}")
+             raise VoiceNotFound(voice_ref_path or "default", available)
 
         if not os.path.exists(target_voice):
-             logger.error(f"Voice file {target_voice} not found.")
-             raise FileNotFoundError(f"Voice file {target_voice} not found.")
+             available = self.list_voices()
+             raise VoiceNotFound(voice_ref_path or "default", available)
 
         try:
             # Check in-memory cache first

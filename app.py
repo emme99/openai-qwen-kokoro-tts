@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 from time import perf_counter
@@ -17,6 +18,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("qwen-tts-api")
 
 app = FastAPI(title="Qwen3 TTS OpenAI API")
+
+# Lock globale: l'inferenza è bloccante e va serializzata (un solo modello in RAM).
+_inference_lock = asyncio.Lock()
 
 # Settings: precedenza env > config.json (deprecato) > default
 settings = Settings.load()
@@ -70,13 +74,17 @@ async def generate_speech(request: SpeechRequest):
         language = request.language or settings.default_language
 
         started_at = perf_counter()
-        # L'engine produce sempre WAV; speed e formato sono centralizzati in audio.py
-        wav_buffer = tts_service.synthesize(
-            request.input,
-            voice_ref_path=request.voice,
-            lang=language,
-            format="wav",
-        )
+        # L'engine produce sempre WAV; speed e formato sono centralizzati in audio.py.
+        # Inferenza in thread separato sotto lock: serializza le richieste concorrenti
+        # senza bloccare l'event loop (pattern identico a tutor-local/backend/app/providers/stt.py).
+        async with _inference_lock:
+            wav_buffer = await asyncio.to_thread(
+                tts_service.synthesize,
+                request.input,
+                voice_ref_path=request.voice,
+                lang=language,
+                format="wav",
+            )
         samples, sample_rate = sf.read(io.BytesIO(wav_buffer.getvalue()), dtype="float32")
 
         # Catena atempo (pitch preservato) prima dell'eventuale mp3
@@ -93,9 +101,9 @@ async def generate_speech(request: SpeechRequest):
 
         process_time_ms = (perf_counter() - started_at) * 1000
 
-        # Return audio stream
+        # Return audio stream (lista di chunk: audio_buffer è bytes)
         return StreamingResponse(
-            audio_buffer,
+            [audio_buffer],
             media_type=media_type,
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
@@ -109,6 +117,9 @@ async def generate_speech(request: SpeechRequest):
         # Voce non risolvibile: errore esplicito con elenco voci disponibili.
         logger.warning(f"Voice not found: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        # Le HTTPException già costruite (400 validazione, ecc.) passano invariate.
+        raise
     except Exception as e:
         logger.error(f"Error generating speech: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

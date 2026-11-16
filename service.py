@@ -51,6 +51,37 @@ class QwenTTSService:
                     names.append(entry[: -len(".wav")])
         return names
 
+    def _prune_voice_cache(self, voice_name: str, keep: int = 2):
+        """Mantiene al massimo `keep` file di cache per voce, cancellando i più vecchi.
+
+        I file di cache hanno il nome `{voice_name}_{mtime}.pt`: l'mtime è
+        incorporato nel nome, quindi l'ordinamento lessicografico coincide
+        con l'ordine cronologico (mtime a 16+ cifre).
+        """
+        if not os.path.isdir(self.cache_dir):
+            return
+        prefix = f"{voice_name}_"
+        entries = [
+            f for f in os.listdir(self.cache_dir)
+            if f.startswith(prefix) and f.endswith(".pt")
+        ]
+        if len(entries) <= keep:
+            return
+        # Ordina per mtime (crescente) e cancella i più vecchi oltre `keep`.
+        def _mtime_of(name: str) -> float:
+            try:
+                return float(name[len(prefix):-len(".pt")])
+            except ValueError:
+                return 0.0
+
+        entries.sort(key=_mtime_of)
+        for old in entries[:-keep]:
+            try:
+                os.remove(os.path.join(self.cache_dir, old))
+                logger.info(f"Cache voice: rimosso {old} (oltre il limite di {keep})")
+            except OSError as e:
+                logger.warning(f"Cache voice: impossibile rimuovere {old}: {e}")
+
     def load_model(self):
         if self.model is not None:
             # Model already loaded
@@ -198,8 +229,8 @@ class QwenTTSService:
                 if os.path.exists(cache_path):
                     logger.info(f"Loading cached prompt from {cache_path}")
                     try:
-                        # weights_only=False is required for custom classes/structs in older pytorch versions or complex objects
-                        # We trust our local cache.
+                        # weights_only=False: il prompt contiene oggetti custom del modello.
+                        # La cache è locale e non condivisa: il pickle è di una fonte fidata.
                         prompt = torch.load(cache_path, map_location=self.device, weights_only=False)
                     except Exception as e:
                         logger.warning(f"Failed to load cache: {e}")
@@ -214,6 +245,10 @@ class QwenTTSService:
                     # Save to cache
                     try:
                         torch.save(prompt, cache_path)
+                        # Mantieni al massimo 2 file di cache per voce.
+                        # voice_name è il basename (es. "alloy.wav"): il prefix
+                        # "alloy.wav_" è univoco e non collide con altre voci.
+                        self._prune_voice_cache(voice_name, keep=2)
                     except Exception as e:
                         logger.warning(f"Failed to save cache: {e}")
                 

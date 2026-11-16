@@ -66,6 +66,14 @@ async def generate_speech(request: SpeechRequest):
         if not request.input:
             raise HTTPException(status_code=400, detail="Input text is required.")
 
+        # Guardrail: input troppo lungo -> 400
+        if len(request.input) > settings.max_input_chars:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Input troppo lungo: {len(request.input)} caratteri "
+                       f"(max {settings.max_input_chars})",
+            )
+
         # Validazione speed: fuori range -> 400
         speed = request.speed if request.speed is not None else 1.0
         if not (audio.SPEED_MIN <= speed <= audio.SPEED_MAX):

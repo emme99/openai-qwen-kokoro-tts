@@ -77,7 +77,8 @@ class Settings:
     flash_attn: bool = False
 
     # --- Kokoro-82M (onnx, CPU) ---
-    kokoro_model_path: str = "./models/kokoro-v1.0.onnx"
+    # int8 di default: ~2x più veloce del fp32 su CPU, qualità equivalente.
+    kokoro_model_path: str = "./models/kokoro-v1.0.int8.onnx"
     kokoro_voices_path: str = "./models/voices-v1.0.bin"
 
     # config.json letto (per test e deprecazione)
@@ -130,7 +131,7 @@ class Settings:
                 "flash_attn", "FLASH_ATTN", False, cast=lambda v: _env_bool(v, False)
             ),
             kokoro_model_path=pick(
-                "kokoro_model_path", "KOKORO_MODEL_PATH", "./models/kokoro-v1.0.onnx"
+                "kokoro_model_path", "KOKORO_MODEL_PATH", "./models/kokoro-v1.0.int8.onnx"
             ),
             kokoro_voices_path=pick(
                 "kokoro_voices_path", "KOKORO_VOICES_PATH", "./models/voices-v1.0.bin"

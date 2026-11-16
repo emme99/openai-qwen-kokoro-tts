@@ -1,6 +1,7 @@
 import asyncio
 import io
 import logging
+from contextlib import asynccontextmanager
 from time import perf_counter
 from typing import Optional
 
@@ -17,7 +18,17 @@ from service import QwenTTSService, VoiceNotFound
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("qwen-tts-api")
 
-app = FastAPI(title="Qwen3 TTS OpenAI API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Preload del modello all'avvio se PRELOAD=true (in thread, non blocca l'event loop)."""
+    if settings.preload:
+        logger.info("PRELOAD=true: carico il modello all'avvio...")
+        await asyncio.to_thread(tts_service.load_model)
+        logger.info("Modello precaricato.")
+    yield
+
+
+app = FastAPI(title="Qwen3 TTS OpenAI API", lifespan=lifespan)
 
 # Lock globale: l'inferenza è bloccante e va serializzata (un solo modello in RAM).
 _inference_lock = asyncio.Lock()
@@ -45,12 +56,6 @@ class SpeechRequest(BaseModel):
     language: Optional[str] = None 
     response_format: Optional[str] = "mp3" 
     speed: Optional[float] = 1.0
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting up Qwen TTS Service...")
-    # Optional: Preload model on startup
-    # tts_service.load_model() 
 
 @app.post("/v1/audio/speech")
 async def generate_speech(request: SpeechRequest):
@@ -126,7 +131,13 @@ async def generate_speech(request: SpeechRequest):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "engine": settings.tts_engine,
+        "device": tts_service.device,
+        "model_loaded": tts_service.model is not None,
+        "defaults": {"it": settings.voice_it, "en": settings.voice_en},
+    }
 
 if __name__ == "__main__":
     import uvicorn

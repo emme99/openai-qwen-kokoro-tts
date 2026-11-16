@@ -7,6 +7,7 @@ import time
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 import app as app_module
 
@@ -18,7 +19,46 @@ def _post(client, payload):
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["engine"] == "qwen"
+    assert body["device"] == "fake"
+    assert body["model_loaded"] is False
+    assert body["defaults"] == {"it": "alloy", "en": "ash"}
+
+
+def test_preload_calls_load_model(monkeypatch):
+    """Con PRELOAD=true il lifespan chiama load_model all'avvio."""
+    from tests.conftest import FakeEngine
+
+    fake = FakeEngine()
+    loaded = []
+    fake.load_model = lambda: loaded.append(True)
+
+    monkeypatch.setattr(app_module, "tts_service", fake)
+    monkeypatch.setattr(app_module.settings, "preload", True)
+
+    with TestClient(app_module.app):
+        pass
+
+    assert loaded == [True]
+
+
+def test_no_preload_skips_load_model(monkeypatch):
+    """Con PRELOAD=false il modello non viene caricato all'avvio."""
+    from tests.conftest import FakeEngine
+
+    fake = FakeEngine()
+    loaded = []
+    fake.load_model = lambda: loaded.append(True)
+
+    monkeypatch.setattr(app_module, "tts_service", fake)
+    monkeypatch.setattr(app_module.settings, "preload", False)
+
+    with TestClient(app_module.app):
+        pass
+
+    assert loaded == []
 
 
 def test_speech_returns_wav(client):

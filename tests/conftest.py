@@ -22,6 +22,7 @@ class FakeEngine:
         self.duration = duration
         self.device = "fake"
         self.calls = 0
+        self.model = None  # per /health (model_loaded)
 
     def synthesize(self, text: str, voice_ref_path: str = None, lang: str = "it", format: str = "wav"):
         import time
@@ -38,6 +39,10 @@ class FakeEngine:
 
     def list_voices(self) -> list[str]:
         return ["alloy", "ash"]
+
+    def load_model(self):
+        """No-op: il modello finto è sempre 'caricato'."""
+        pass
 
 
 @pytest.fixture

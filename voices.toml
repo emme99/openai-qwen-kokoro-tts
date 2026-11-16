@@ -1,0 +1,23 @@
+# Registro voci unificato: nome logico stabile + binding per engine.
+# Il client (tutor-local) usa solo i nomi logici; il binding è opzionale per
+# engine: se manca, la risoluzione cade sul default per lingua (con warning).
+
+[alloy]
+language = "it"
+qwen = "voices/alloy.wav"
+kokoro = "if_sara"
+
+[ash]
+language = "en"
+qwen = "voices/ash.wav"
+kokoro = "am_adam"
+
+[nova]
+language = "en"
+qwen = "voices/nova.wav"
+kokoro = "af_heart"
+
+[sage]
+language = "en"
+qwen = "voices/sage.wav"
+kokoro = "bf_emma"

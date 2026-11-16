@@ -1,0 +1,14 @@
+# Job CI per la web-app. Spostare in .github/workflows/ci.yml (o aggiungere al workflow esistente).
+# Nessun modello, nessun servizio attivo: solo test dei moduli puri.
+name: webapp
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: web-app } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - run: npm test

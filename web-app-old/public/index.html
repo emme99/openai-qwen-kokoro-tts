@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>Console TTS — valutazione OpenAI-compatible</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>Console TTS</h1>
+  <p class="muted">Test e valutazione per servizi TTS OpenAI-compatible: Qwen3-TTS, Kokoro-82M, macOS say, altri.</p>
+  <div id="profileBar" class="badges" aria-live="polite"></div>
+  <button id="refreshHealth" class="ghost small">Aggiorna stato</button>
+  <nav class="tabs" role="tablist">
+    <button data-tab="synth" class="active" role="tab">Sintesi</button>
+    <button data-tab="ab" role="tab">Confronto A/B</button>
+    <button data-tab="bench" role="tab">Bench</button>
+    <button data-tab="history" role="tab">Storia</button>
+  </nav>
+</header>
+<main>
+<section id="tab-synth" class="tab active">
+  <div class="grid">
+    <div class="card">
+      <div class="field"><label for="profileSelect">Profilo</label><select id="profileSelect"></select></div>
+      <div class="field"><label for="voiceSelect">Voce</label>
+        <select id="voiceSelect"></select>
+        <label class="check"><input type="checkbox" id="voiceFree"> input libero</label>
+        <input type="text" id="voiceInput" placeholder="nome voce" hidden>
+        <span id="engineBadge" class="muted small"></span>
+      </div>
+      <div class="field"><label for="languageSelect">Lingua</label>
+        <select id="languageSelect"><option value="it">Italiano</option><option value="en">English</option></select>
+      </div>
+      <div class="field"><label for="speedRange">Velocità <span id="speedValue">1.0</span>×</label>
+        <input type="range" id="speedRange" min="0.25" max="4" step="0.05" value="1">
+        <div class="presets">
+          <button data-speed="0.3" class="ghost small">0.3×</button>
+          <button data-speed="0.7" class="ghost small">0.7×</button>
+          <button data-speed="1" class="ghost small">1.0×</button>
+        </div>
+      </div>
+      <div class="field"><label for="formatSelect">Formato</label>
+        <select id="formatSelect"><option value="mp3">mp3</option><option value="wav">wav</option></select>
+      </div>
+      <div class="field"><label for="modelInput">Model</label><input type="text" id="modelInput" value="tts-1"></div>
+      <div class="field"><label for="textInput">Testo</label>
+        <textarea id="textInput" rows="4">Ciao, come stai? Oggi proviamo la sintesi vocale.</textarea>
+      </div>
+      <button id="generateBtn">Genera audio (Ctrl+Invio)</button>
+      <div id="status" class="status" aria-live="polite"></div>
+      <div id="fallbackBanner" class="banner" hidden></div>
+      <audio id="audioPlayer" controls></audio>
+    </div>
+    <div class="card">
+      <h3>Metriche</h3>
+      <div class="metrics">
+        <p><span>Servizio</span><strong id="mService">--</strong></p>
+        <p><span>Totale client</span><strong id="mTotal">--</strong></p>
+        <p><span>Durata audio</span><strong id="mAudio">--</strong></p>
+        <p><span>RTF</span><strong id="mRtf">--</strong></p>
+        <p><span>Dimensione</span><strong id="mBytes">--</strong></p>
+        <p><span>Voce risolta</span><strong id="mVoice">--</strong></p>
+      </div>
+      <h3>p50 / p95 per profilo · device</h3>
+      <table><thead><tr><th>Gruppo</th><th>n</th><th>p50</th><th>p95</th><th>RTF</th></tr></thead><tbody id="aggTable"></tbody></table>
+      <details id="profileManager">
+        <summary>Gestisci profili</summary>
+        <div class="field"><label for="pmSelect">Profilo da modificare</label><select id="pmSelect"></select></div>
+        <div class="field"><label for="pmName">Nome</label><input id="pmName"></div>
+        <div class="field"><label for="pmBaseUrl">Base URL</label><input id="pmBaseUrl" placeholder="http://127.0.0.1:5050"></div>
+        <div class="field"><label for="pmModel">Model</label><input id="pmModel" value="tts-1"></div>
+        <div class="field"><label for="pmApiKey">API key (opzionale)</label><input id="pmApiKey" type="password"></div>
+        <div class="field"><label for="pmVoiceIt">Voce IT</label><input id="pmVoiceIt" value="alloy"></div>
+        <div class="field"><label for="pmVoiceEn">Voce EN</label><input id="pmVoiceEn" value="ash"></div>
+        <div class="row">
+          <button id="pmSave" class="ghost small">Salva</button>
+          <button id="pmAdd" class="ghost small">Aggiungi nuovo</button>
+          <button id="pmDelete" class="ghost small danger">Elimina</button>
+        </div>
+        <p class="muted small" id="pmHint"></p>
+      </details>
+    </div>
+  </div>
+</section>
+<section id="tab-ab" class="tab">
+  <div class="card">
+    <p class="muted">Stesso testo su due profili, sintesi sequenziale, etichette A/B casuali. Vota prima di guardare i nomi.</p>
+    <div class="row">
+      <div class="field"><label for="abProfileA">Profilo 1</label><select id="abProfileA"></select></div>
+      <div class="field"><label for="abProfileB">Profilo 2</label><select id="abProfileB"></select></div>
+      <div class="field"><label for="abLanguage">Lingua</label><select id="abLanguage"><option value="it">Italiano</option><option value="en">English</option></select></div>
+      <div class="field"><label for="abSpeed">Velocità</label><input type="number" id="abSpeed" value="1" min="0.25" max="4" step="0.05"></div>
+    </div>
+    <div class="field"><label for="abText">Testo</label><textarea id="abText" rows="3">The weather today is surprisingly warm for this time of year.</textarea></div>
+    <button id="abRun">Genera A/B</button>
+    <div id="abStatus" class="status" aria-live="polite"></div>
+    <div class="row">
+      <div class="abslot"><h3>A</h3><audio id="abPlayerA" controls></audio></div>
+      <div class="abslot"><h3>B</h3><audio id="abPlayerB" controls></audio></div>
+    </div>
+    <div class="row">
+      <button id="abVoteA" class="ghost" disabled>Voto A</button>
+      <button id="abVoteB" class="ghost" disabled>Voto B</button>
+      <button id="abVoteTie" class="ghost" disabled>Pari</button>
+      <input id="abNote" placeholder="nota (opzionale)">
+    </div>
+    <div id="abReveal" class="banner" hidden></div>
+    <h3>Tally</h3><div id="abTally" class="muted"></div>
+    <div class="row"><button id="abExportJson" class="ghost small">Export JSON</button><button id="abExportMd" class="ghost small">Export MD</button></div>
+  </div>
+</section>
+<section id="tab-bench" class="tab">
+  <div class="card">
+    <p class="muted">Set frasi condiviso (phrases.json), warmup scartato, run sequenziali con pacing. Stessi gate del bench CLI.</p>
+    <div id="benchProfiles" class="checks"></div>
+    <div class="row">
+      <div class="field"><label for="benchRepeats">Repeats</label><input type="number" id="benchRepeats" value="3" min="1" max="10"></div>
+      <div class="field"><label for="benchPacing">Pacing (ms)</label><input type="number" id="benchPacing" value="250" min="0" max="5000"></div>
+      <div class="field"><label for="benchSpeed">Velocità</label><input type="number" id="benchSpeed" value="1" min="0.25" max="4" step="0.05"></div>
+    </div>
+    <div id="benchGates" class="checks"></div>
+    <div class="row"><button id="benchStart">Avvia bench</button><button id="benchCancel" class="ghost danger" disabled>Annulla</button></div>
+    <div id="benchProgress" class="status" aria-live="polite"></div>
+    <table><thead><tr><th>Profilo</th><th>n</th><th>p50</th><th>p95</th><th>RTF</th><th>Gate</th><th>Esito</th></tr></thead><tbody id="benchResults"></tbody></table>
+    <p class="muted small" id="benchFingerprint"></p>
+    <div class="row"><button id="benchExportMd" class="ghost small">Export report.md</button><button id="benchExportJson" class="ghost small">Export JSON</button></div>
+  </div>
+</section>
+<section id="tab-history" class="tab">
+  <div class="card">
+    <div class="row">
+      <div class="field"><label for="histFilterProfile">Profilo</label><select id="histFilterProfile"><option value="">tutti</option></select></div>
+      <div class="field"><label for="histFilterDevice">Device</label><select id="histFilterDevice"><option value="">tutti</option></select></div>
+      <span id="histCount" class="muted"></span>
+    </div>
+    <table><thead><tr><th>Ora</th><th>Profilo</th><th>Device</th><th>Voce</th><th>Servizio</th><th>Totale</th><th>RTF</th><th></th></tr></thead><tbody id="histTable"></tbody></table>
+    <div class="row">
+      <button id="histExportCsv" class="ghost small">Export CSV</button>
+      <button id="histExportJson" class="ghost small">Export JSON</button>
+      <button id="histClear" class="ghost small danger">Svuota</button>
+    </div>
+  </div>
+</section>
+</main>
+<script type="module">import { init } from "./js/ui.js"; init();</script>
+</body>
+</html>

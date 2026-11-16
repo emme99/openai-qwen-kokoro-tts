@@ -1,0 +1,15 @@
+{
+  "name": "tts-eval-console",
+  "version": "2.0.0",
+  "description": "Console di valutazione per servizi TTS OpenAI-compatible (Qwen3-TTS, Kokoro-82M, macOS say, altri)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

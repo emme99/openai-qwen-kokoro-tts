@@ -1,0 +1,12 @@
+[
+  { "id": "it01", "lang": "it", "text": "Buongiorno, vorrei prenotare una camera doppia per due notti, possibilmente con vista." },
+  { "id": "it02", "lang": "it", "text": "Il treno per Milano parte dal binario sette con circa venti minuti di ritardo." },
+  { "id": "it03", "lang": "it", "text": "Potresti spiegarmi come funziona il ripasso espaciato dei vocaboli che ho sbagliato?" },
+  { "id": "it04", "lang": "it", "text": "Oggi il cielo è nuvoloso ma dovrebbe schiarire nel pomeriggio, secondo le previsioni." },
+  { "id": "it05", "lang": "it", "text": "Ho comprato un libro interessante sulla storia delle lingue e lo sto leggendo volentieri." },
+  { "id": "en01", "lang": "en", "text": "I went to Milan last week and visited a wonderful museum near the city centre." },
+  { "id": "en02", "lang": "en", "text": "Could you tell me how to get to the nearest underground station from here?" },
+  { "id": "en03", "lang": "en", "text": "She thought about the question for a while before giving a careful answer." },
+  { "id": "en04", "lang": "en", "text": "The weather forecast says it will be sunny tomorrow, so we should plan a walk." },
+  { "id": "en05", "lang": "en", "text": "I would like a table for two, please, somewhere quiet if that is possible." }
+]

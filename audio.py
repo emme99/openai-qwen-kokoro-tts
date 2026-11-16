@@ -101,3 +101,18 @@ def encode_mp3(samples: np.ndarray, sample_rate: int) -> bytes:
     if process.returncode != 0:
         raise RuntimeError(f"ffmpeg mp3 fallito: {process.stderr.decode(errors='replace')}")
     return process.stdout
+
+
+def render(
+    samples: np.ndarray, sample_rate: int, speed: float, fmt: str
+) -> tuple[bytes, str, str]:
+    """UNICO percorso di rendering: atempo -> WAV o MP3.
+
+    Ritorna (audio_bytes, media_type, filename). Gli engine non devono mai
+    codificare: passano (samples, sr) e tutto il resto avviene qui, così il
+    comportamento è identico tra engine.
+    """
+    out = apply_atempo(samples, sample_rate, speed)
+    if fmt == "mp3":
+        return encode_mp3(out, sample_rate), "audio/mpeg", "speech.mp3"
+    return encode_wav(out, sample_rate), "audio/wav", "speech.wav"

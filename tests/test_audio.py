@@ -1,5 +1,6 @@
-"""Test T1.1: catena atempo pura + encoding."""
+"""Test T1.1: catena atempo pura + encoding. T2.2: percorso unico render()."""
 
+import hashlib
 import io
 import subprocess
 
@@ -108,3 +109,47 @@ def test_encode_mp3_produces_valid_mp3():
     )
     assert "mp3" in proc.stdout.decode().strip()
     assert len(mp3_bytes) > 1000
+
+
+# --- T2.2: render() è l'unico percorso di encoding ---
+
+def _golden_sine(sr: int = 24000, seconds: float = 0.5, freq: float = 440.0) -> np.ndarray:
+    t = np.arange(int(sr * seconds)) / sr
+    return (0.5 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+
+def test_render_wav_golden_sha256():
+    """Golden test: stessa sinusoide in ingresso -> stesso SHA256 del WAV in uscita."""
+    samples = _golden_sine()
+    buf1, media1, name1 = audio.render(samples, 24000, 1.0, "wav")
+    buf2, media2, name2 = audio.render(_golden_sine(), 24000, 1.0, "wav")
+    assert media1 == media2 == "audio/wav"
+    assert name1 == name2 == "speech.wav"
+    assert hashlib.sha256(buf1).hexdigest() == hashlib.sha256(buf2).hexdigest()
+
+
+def test_render_wav_matches_encode_wav():
+    """render() con speed=1.0 equivale a encode_wav() (nessun atempo)."""
+    samples = _golden_sine()
+    buf, media, name = audio.render(samples, 24000, 1.0, "wav")
+    assert buf == audio.encode_wav(samples, 24000)
+
+
+def test_render_mp3_golden_sha256():
+    """Golden test mp3: stessa sinusoide -> stesso SHA256 (ffmpeg deterministico)."""
+    samples = _golden_sine()
+    buf1, media1, name1 = audio.render(samples, 24000, 1.0, "mp3")
+    buf2, media2, name2 = audio.render(_golden_sine(), 24000, 1.0, "mp3")
+    assert media1 == media2 == "audio/mpeg"
+    assert name1 == name2 == "speech.mp3"
+    assert hashlib.sha256(buf1).hexdigest() == hashlib.sha256(buf2).hexdigest()
+
+
+def test_render_applies_atempo(tmp_path):
+    """render() con speed != 1.0 cambia la durata (atempo applicato)."""
+    sr = 24000
+    samples = _golden_sine(seconds=1.0)
+    buf, _, _ = audio.render(samples, sr, 2.0, "wav")
+    duration = _duration_seconds(buf, tmp_path)
+    # 1s / 2.0 = 0.5s, tolleranza 10%
+    assert duration == pytest.approx(0.5, rel=0.10)

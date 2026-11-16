@@ -95,17 +95,10 @@ async def generate_speech(request: SpeechRequest):
                 language=language,
             )
 
-        # Catena atempo (pitch preservato) prima dell'eventuale mp3
-        samples = audio.apply_atempo(samples, sample_rate, speed)
-
-        if request.response_format == "mp3":
-            audio_buffer = audio.encode_mp3(samples, sample_rate)
-            media_type = "audio/mpeg"
-            filename = "speech.mp3"
-        else:
-            audio_buffer = audio.encode_wav(samples, sample_rate)
-            media_type = "audio/wav"
-            filename = "speech.wav"
+        # Percorso unico di rendering (atempo + encoding) in audio.py
+        audio_buffer, media_type, filename = audio.render(
+            samples, sample_rate, speed, request.response_format
+        )
 
         process_time_ms = (perf_counter() - started_at) * 1000
 

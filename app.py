@@ -1,4 +1,3 @@
-import os
 import logging
 from time import perf_counter
 from fastapi import FastAPI, HTTPException
@@ -6,6 +5,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 
+from dotenv import load_dotenv
+
+# Carica .env (se presente) PRIMA di risolvere le Settings
+load_dotenv()
+
+from config import Settings
 from service import QwenTTSService
 
 # Configure logging
@@ -14,30 +19,19 @@ logger = logging.getLogger("qwen-tts-api")
 
 app = FastAPI(title="Qwen3 TTS OpenAI API")
 
-# Configuration
-import json
-
-# Configuration loading
-CONFIG_FILE = "config.json"
-config = {}
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE, "r") as f:
-        config = json.load(f)
-
-# Defaults or overrides
-MODEL_PATH = os.getenv("MODEL_PATH", config.get("model_path", "./models/Qwen/Qwen3-TTS-12Hz-0.6B-Base"))
-DEVICE = os.getenv("DEVICE", config.get("device", "cpu"))
-DTYPE = os.getenv("DTYPE", config.get("dtype", "float32"))
-FLASH_ATTN = os.getenv("FLASH_ATTN", str(config.get("flash_attention", False))).lower() == "true"
-DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE", config.get("default_language", "it"))
+# Settings: precedenza env > config.json (deprecato) > default
+settings = Settings.load()
 
 # Initialize Service
-logger.info(f"Initializing service with config: model={MODEL_PATH}, device={DEVICE}, dtype={DTYPE}, flash_attn={FLASH_ATTN}, lang={DEFAULT_LANGUAGE}")
+logger.info(
+    f"Initializing service with config: model={settings.model_path}, device={settings.device}, "
+    f"dtype={settings.dtype}, flash_attn={settings.flash_attn}, lang={settings.default_language}"
+)
 tts_service = QwenTTSService(
-    model_path=MODEL_PATH, 
-    device=DEVICE,
-    dtype=DTYPE,
-    flash_attn=FLASH_ATTN
+    model_path=settings.model_path,
+    device=settings.device,
+    dtype=settings.dtype,
+    flash_attn=settings.flash_attn
 )
 
 # OpenAI-compatible Request Model
@@ -65,8 +59,8 @@ async def generate_speech(request: SpeechRequest):
             raise HTTPException(status_code=400, detail="Input text is required.")
 
         # Determine language
-        # Use request param if provided, otherwise default from config
-        language = request.language or DEFAULT_LANGUAGE
+        # Use request param if provided, otherwise default from settings
+        language = request.language or settings.default_language
         
         started_at = perf_counter()
         audio_buffer = tts_service.synthesize(
@@ -106,6 +100,5 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    port = config.get("port", 8000)
-    logger.info(f"Starting server on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    logger.info(f"Starting server on {settings.host}:{settings.port}")
+    uvicorn.run(app, host=settings.host, port=settings.port)

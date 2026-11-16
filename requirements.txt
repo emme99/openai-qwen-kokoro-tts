@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+python-dotenv
 # Torch CPU version is preferred for RPi, but locally on Mac standard torch is fine.
 # For RPi Dockerfile we will specify the cpu wheel explicitly if needed, 
 # but for requirements.txt we keep it generic or platform specific.

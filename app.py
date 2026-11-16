@@ -1,11 +1,14 @@
+import io
 import logging
 from time import perf_counter
 from typing import Optional
 
+import soundfile as sf
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+import audio
 from config import Settings
 from service import QwenTTSService, VoiceNotFound
 
@@ -54,29 +57,45 @@ async def generate_speech(request: SpeechRequest):
         if not request.input:
             raise HTTPException(status_code=400, detail="Input text is required.")
 
+        # Validazione speed: fuori range -> 400
+        speed = request.speed if request.speed is not None else 1.0
+        if not (audio.SPEED_MIN <= speed <= audio.SPEED_MAX):
+            raise HTTPException(
+                status_code=400,
+                detail=f"speed deve essere in [{audio.SPEED_MIN}, {audio.SPEED_MAX}], ricevuto {speed}",
+            )
+
         # Determine language
         # Use request param if provided, otherwise default from settings
         language = request.language or settings.default_language
-        
+
         started_at = perf_counter()
-        audio_buffer = tts_service.synthesize(
-            request.input, 
-            voice_ref_path=request.voice, 
+        # L'engine produce sempre WAV; speed e formato sono centralizzati in audio.py
+        wav_buffer = tts_service.synthesize(
+            request.input,
+            voice_ref_path=request.voice,
             lang=language,
-            format=request.response_format
+            format="wav",
         )
-        process_time_ms = (perf_counter() - started_at) * 1000
-        
-        media_type = "audio/wav"
-        filename = "speech.wav"
-        
+        samples, sample_rate = sf.read(io.BytesIO(wav_buffer.getvalue()), dtype="float32")
+
+        # Catena atempo (pitch preservato) prima dell'eventuale mp3
+        samples = audio.apply_atempo(samples, sample_rate, speed)
+
         if request.response_format == "mp3":
+            audio_buffer = audio.encode_mp3(samples, sample_rate)
             media_type = "audio/mpeg"
             filename = "speech.mp3"
-        
+        else:
+            audio_buffer = audio.encode_wav(samples, sample_rate)
+            media_type = "audio/wav"
+            filename = "speech.wav"
+
+        process_time_ms = (perf_counter() - started_at) * 1000
+
         # Return audio stream
         return StreamingResponse(
-            audio_buffer, 
+            audio_buffer,
             media_type=media_type,
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
